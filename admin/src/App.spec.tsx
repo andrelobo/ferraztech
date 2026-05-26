@@ -6,7 +6,13 @@ import App from './App'
 vi.mock('./services/api', () => ({
   default: {
     get: vi.fn().mockResolvedValue({
-      data: { connected: true, qrCode: null, uptime: 100, retryCount: 0 },
+      data: {
+        sessions: [
+          { id: 'session-1', connected: true, qrCode: null, retryCount: 0, startTime: 1000 },
+        ],
+        activeSession: 'session-1',
+        uptime: 100,
+      },
     }),
   },
 }))

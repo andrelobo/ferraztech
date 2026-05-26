@@ -1,15 +1,22 @@
 import { useEffect, useState } from 'react'
 import api from '../services/api'
 
-interface Status {
+interface SessionStatus {
+  id: string
   connected: boolean
   qrCode: string | null
-  uptime: number
   retryCount: number
+  startTime: number
+}
+
+interface MultiStatus {
+  sessions: SessionStatus[]
+  activeSession: string | null
+  uptime: number
 }
 
 export function WhatsAppStatus() {
-  const [status, setStatus] = useState<Status | null>(null)
+  const [status, setStatus] = useState<MultiStatus | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,20 +27,31 @@ export function WhatsAppStatus() {
   }, [])
 
   if (loading) return <div>Carregando...</div>
+  if (!status) return null
+
+  const connected = status.activeSession !== null
+  const connectedSessions = status.sessions.filter((s) => s.connected).length
+  const totalSessions = status.sessions.length
 
   return (
     <div>
       <h2>WhatsApp</h2>
       <p>
         Status:{' '}
-        <strong>
-          {status?.connected ? 'Conectado' : 'Desconectado'}
-        </strong>
+        <strong>{connected ? 'Conectado' : 'Desconectado'}</strong>
       </p>
-      {status?.uptime ? <p>Uptime: {status.uptime}s</p> : null}
-      {status && status.retryCount > 0 ? (
-        <p>Tentativas de reconexão: {status.retryCount}</p>
-      ) : null}
+      <p>
+        Sessões: {connectedSessions}/{totalSessions} ativas
+      </p>
+      {connected && <p>Sessão ativa: {status.activeSession}</p>}
+      {status.uptime ? <p>Uptime: {status.uptime}s</p> : null}
+      {status.sessions.map((s) =>
+        s.retryCount > 0 ? (
+          <p key={s.id}>
+            {s.id}: {s.retryCount} tentativas de reconexão
+          </p>
+        ) : null,
+      )}
     </div>
   )
 }

@@ -1,101 +1,104 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { Client, LocalAuth, Message as WAMessage } from 'whatsapp-web.js'
+import { WhatsAppSession } from './whatsapp.session'
+import { BotService } from '../bot/bot.service'
+import { ConversationsService } from '../conversations/conversations.service'
+import { LeadsService } from '../leads/leads.service'
 
 @Injectable()
 export class WhatsAppService implements OnModuleInit {
   private readonly logger = new Logger(WhatsAppService.name)
-  private client: Client
-  private isReady = false
-  private qrCode: string | null = null
-  private retryCount = 0
+  private sessions: WhatsAppSession[] = []
   private startTime = Date.now()
 
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    private botService: BotService,
+    private conversationsService: ConversationsService,
+    private leadsService: LeadsService,
+  ) {}
 
   async onModuleInit() {
-    await this.initialize()
-  }
+    const count = this.configService.get('WHATSAPP_SESSION_COUNT', 2)
 
-  private async initialize() {
-    this.client = new Client({
-      authStrategy: new LocalAuth({
-        dataPath: this.configService.get('WHATSAPP_SESSION_PATH', './sessions'),
-      }),
-      puppeteer: {
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      },
-    })
-
-    this.client.on('qr', (qr: string) => {
-      this.qrCode = qr
-      this.logger.log('QR code received')
-    })
-
-    this.client.on('ready', () => {
-      this.isReady = true
-      this.qrCode = null
-      this.retryCount = 0
-      this.logger.log('WhatsApp client ready')
-    })
-
-    this.client.on('disconnected', async (reason: string) => {
-      this.isReady = false
-      this.logger.warn(`WhatsApp disconnected: ${reason}`)
-      await this.handleReconnect()
-    })
-
-    this.client.on('message', async (message: WAMessage) => {
-      this.logger.debug(`Message from ${message.from}: ${message.body}`)
-    })
-
-    try {
-      await this.client.initialize()
-    } catch (error) {
-      this.logger.error('Failed to initialize WhatsApp client', error)
+    for (let i = 1; i <= count; i++) {
+      const session = new WhatsAppSession(
+        `session-${i}`,
+        this.configService,
+        (from, body) => this.handleIncomingMessage(from, body).catch((err) =>
+          this.logger.error(`Error handling message from ${from}`, err),
+        ),
+      )
+      this.sessions.push(session)
+      await session.start()
     }
-  }
-
-  private async handleReconnect() {
-    const maxRetries = this.configService.get('WHATSAPP_MAX_RETRIES', 5)
-    const retryDelay = this.configService.get('WHATSAPP_RETRY_DELAY_MS', 5000)
-
-    if (this.retryCount >= maxRetries) {
-      this.logger.error('Max reconnect retries reached')
-      return
-    }
-
-    this.retryCount++
-    this.logger.log(
-      `Reconnecting (attempt ${this.retryCount}/${maxRetries})...`,
-    )
-
-    await new Promise((resolve) => setTimeout(resolve, retryDelay))
-    await this.initialize()
   }
 
   getStatus() {
+    const states = this.sessions.map((s) => s.state)
+    const activeSession = states.find((s) => s.connected)?.id || null
     return {
-      connected: this.isReady,
-      qrCode: this.qrCode,
+      sessions: states,
+      activeSession,
       uptime: Math.floor((Date.now() - this.startTime) / 1000),
-      retryCount: this.retryCount,
     }
   }
 
   async sendMessage(to: string, message: string) {
-    if (!this.isReady) {
-      return { queued: true, to, message }
+    for (const session of this.sessions) {
+      if (session.state.connected) {
+        try {
+          await session.sendMessage(to, message)
+          return { sent: true, to, message, sessionId: session.id }
+        } catch (err) {
+          this.logger.warn(
+            `[${session.id}] Failed to send message, trying next session...`,
+          )
+        }
+      }
+    }
+    return { queued: true, to, message }
+  }
+
+  private async handleIncomingMessage(from: string, body: string) {
+    let conversation = await this.conversationsService.findByPhone(from)
+
+    if (!conversation) {
+      const lead = await this.leadsService.create({
+        name: from,
+        phone: from,
+        serviceType: 'indefinido',
+      })
+      conversation = await this.conversationsService.create(from, (lead as any)._id.toString())
     }
 
-    try {
-      const chatId = `${to}@c.us`
-      await this.client.sendMessage(chatId, message)
-      return { sent: true, to, message }
-    } catch (error) {
-      this.logger.error(`Failed to send message to ${to}`, error)
-      return { sent: false, to, message, error: (error as Error).message }
+    await this.conversationsService.addMessage(
+      (conversation as any)._id.toString(),
+      'user',
+      body,
+    )
+
+    const reply = await this.botService.processMessage({
+      from,
+      body,
+      name: from,
+    })
+
+    const sendResult = await this.sendMessage(from, reply.reply)
+
+    if (sendResult.sent) {
+      await this.conversationsService.addMessage(
+        (conversation as any)._id.toString(),
+        'bot',
+        reply.reply,
+      )
+    }
+
+    if (reply.action && reply.action !== 'indefinido') {
+      const lead = await this.leadsService.findByPhone(from)
+      if (lead) {
+        await this.leadsService.updateServiceType((lead as any)._id.toString(), reply.action)
+      }
     }
   }
 }

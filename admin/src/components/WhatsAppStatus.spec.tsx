@@ -10,6 +10,15 @@ vi.mock('../services/api', () => ({
 
 import api from '../services/api'
 
+const mockMultiSessionStatus = {
+  sessions: [
+    { id: 'session-1', connected: true, qrCode: null, retryCount: 0, startTime: 1000 },
+    { id: 'session-2', connected: false, qrCode: 'qr-data', retryCount: 0, startTime: 2000 },
+  ],
+  activeSession: 'session-1',
+  uptime: 3600,
+}
+
 describe('WhatsAppStatus', () => {
   beforeEach(() => {
     vi.mocked(api.get).mockReset()
@@ -21,17 +30,26 @@ describe('WhatsAppStatus', () => {
     expect(screen.getByText(/carregando/i)).toBeInTheDocument()
   })
 
-  it('should show connected status', async () => {
+  it('should show connected status with active session', async () => {
     vi.mocked(api.get).mockResolvedValue({
-      data: { connected: true, qrCode: null, uptime: 3600, retryCount: 0 },
+      data: mockMultiSessionStatus,
     })
     render(<WhatsAppStatus />)
-    expect(await screen.findByText(/conectado/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText(/conectado/i)).toBeInTheDocument()
+      expect(screen.getByText(/session-1/i)).toBeInTheDocument()
+    })
   })
 
-  it('should show disconnected status', async () => {
+  it('should show disconnected when all sessions are down', async () => {
     vi.mocked(api.get).mockResolvedValue({
-      data: { connected: false, qrCode: null, uptime: 0, retryCount: 3 },
+      data: {
+        sessions: [
+          { id: 'session-1', connected: false, qrCode: null, retryCount: 3, startTime: 1000 },
+        ],
+        activeSession: null,
+        uptime: 3600,
+      },
     })
     render(<WhatsAppStatus />)
     expect(await screen.findByText(/desconectado/i)).toBeInTheDocument()
