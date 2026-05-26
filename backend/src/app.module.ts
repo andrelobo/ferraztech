@@ -9,6 +9,7 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module'
 import { BotModule } from './modules/bot/bot.module'
 import { AuthModule } from './modules/auth/auth.module'
+import { SeedModule } from './seed/seed.module'
 
 @Module({
   imports: [
