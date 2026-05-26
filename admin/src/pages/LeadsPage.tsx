@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import api from '../services/api'
+import { LeadDetailModal } from '../components/LeadDetailModal'
 
 interface Lead {
   _id: string
@@ -16,6 +17,7 @@ export function LeadsPage() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
   const [serviceFilter, setServiceFilter] = useState('')
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
 
   const fetchLeads = useCallback(() => {
     setLoading(true)
@@ -86,6 +88,7 @@ export function LeadsPage() {
               <th>Telefone</th>
               <th>Serviço</th>
               <th>Status</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -108,10 +111,22 @@ export function LeadsPage() {
                     <option value="lost">Perdido</option>
                   </select>
                 </td>
+                <td>
+                  <button onClick={() => setSelectedLead(lead)}>
+                    Detalhes
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {selectedLead && (
+        <LeadDetailModal
+          lead={selectedLead}
+          onClose={() => setSelectedLead(null)}
+        />
       )}
     </div>
   )
