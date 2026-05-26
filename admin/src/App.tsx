@@ -1,13 +1,13 @@
-import { WhatsAppStatus } from './components/WhatsAppStatus'
-import { LeadsPage } from './pages/LeadsPage'
+import { Routes, Route } from 'react-router-dom'
+import { LoginPage } from './pages/LoginPage'
+import { Dashboard } from './pages/Dashboard'
 
 function App() {
   return (
-    <div>
-      <h1>FerrazTech Admin</h1>
-      <WhatsAppStatus />
-      <LeadsPage />
-    </div>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/*" element={<Dashboard />} />
+    </Routes>
   )
 }
 
