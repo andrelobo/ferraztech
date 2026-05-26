@@ -57,4 +57,29 @@ describe('LeadsPage', () => {
       expect(screen.getByText(/nenhum lead encontrado/i)).toBeInTheDocument()
     })
   })
+
+  it('should filter leads by status', async () => {
+    render(<LeadsPage />)
+    const select = await screen.findByLabelText('Status')
+    await userEvent.selectOptions(select, 'new')
+    expect(api.get).toHaveBeenCalledWith('/leads?status=new')
+  })
+
+  it('should filter leads by service type', async () => {
+    render(<LeadsPage />)
+    const select = await screen.findByLabelText('Serviço')
+    await userEvent.selectOptions(select, 'consultoria')
+    expect(api.get).toHaveBeenCalledWith('/leads?serviceType=consultoria')
+  })
+
+  it('should change lead status via select', async () => {
+    vi.mocked(api.patch).mockResolvedValue({ data: {} })
+    const { container } = render(<LeadsPage />)
+    await screen.findByText('João Silva')
+    const rowSelects = container.querySelectorAll('tbody select')
+    await userEvent.selectOptions(rowSelects[0], 'contacted')
+    expect(api.patch).toHaveBeenCalledWith('/leads/1/status', {
+      status: 'contacted',
+    })
+  })
 })
