@@ -51,6 +51,8 @@ Volume inicial: ~50 usuários/dia. Escabilidade futura planejada via Meta Cloud 
 - **leads** — CRUD e gestão de leads
 - **conversations** — histórico de mensagens
 - **health** — monitoramento da API
+- [x] **auth** — autenticação JWT (login, guard, strategy)
+- [x] **seed** — seed automático de admin user no bootstrap
 
 ## Collections MongoDB
 - leads
@@ -66,6 +68,7 @@ Volume inicial: ~50 usuários/dia. Escabilidade futura planejada via Meta Cloud 
 - `GET /conversations`, `GET /conversations/:phone`
 - `POST /whatsapp/send-message`
 - `GET /whatsapp/status`
+- `POST /auth/login`
 
 ## Funcionalidades do Dashboard
 - Visualizar/filtrar leads (status, tipo de serviço)
@@ -159,8 +162,8 @@ services:
 ## Necessidades para Desenvolvimento
 
 ### Backend (NestJS)
-- [ ] setup do projeto NestJS com TypeScript
-- [ ] conexão com MongoDB Atlas (Mongoose)
+- [x] setup do projeto NestJS com TypeScript
+- [x] conexão com MongoDB Atlas (Mongoose)
 - [ ] módulo `whatsapp` — integração whatsapp-web.js com reconexão automática, multi-session, heartbeat, persistência de sessão em disco + MongoDB
 - [ ] módulo `bot` — fluxos/menus automáticos (lógica de atendimento)
 - [ ] módulo `leads` — CRUD + filtros + status
@@ -168,28 +171,28 @@ services:
 - [ ] módulo `health` — health check da API + status do WhatsApp + uptime
 - [ ] rate limiting interno com fila de mensagens (Bull ou similar)
 - [ ] retry com backoff exponencial
-- [ ] DTOs, pipes, guards, validação (class-validator)
-- [ ] helmet + CORS configurados
-- [ ] Dockerfile multi-stage (dev + prod)
+- [x] DTOs, pipes, guards, validação (class-validator)
+- [x] helmet + CORS configurados
+- [x] Dockerfile multi-stage (dev + prod)
 
 ### Frontend Admin (React)
-- [ ] setup React + TypeScript + Vite
-- [ ] tela de login (admin) com JWT
-- [ ] página de leads com tabela, filtros (status, serviço) e busca
+- [x] setup React + TypeScript + Vite
+- [x] tela de login (admin) com JWT
+- [x] página de leads com tabela, filtros (status, serviço) e busca
 - [ ] modal de detalhes do lead + histórico da conversa
-- [ ] ação de alterar status do lead
+- [x] ação de alterar status do lead
 - [ ] painel de envio manual de mensagem
-- [ ] indicador de status da conexão WhatsApp (com pooling)
-- [ ] consumo da API com axios + interceptors (token)
+- [x] indicador de status da conexão WhatsApp (com pooling)
+- [x] consumo da API com axios + interceptors (token)
 
 ### Infra & DevOps
-- [ ] docker-compose (perfil dev + prod separados)
-- [ ] Dockerfile multi-stage para backend
-- [ ] Dockerfile para admin (build → nginx static)
-- [ ] config do nginx (reverse proxy + SSL + static files)
-- [ ] .env.example com todas as variáveis
-- [ ] scripts: setup.sh (local), deploy.sh (VPS), backup.sh (VPS)
-- [ ] GitHub Actions: CI (lint + test) + CD (build + deploy VPS)
+- [x] docker-compose (perfil dev + prod separados)
+- [x] Dockerfile multi-stage para backend
+- [x] Dockerfile para admin (build → nginx static)
+- [x] config do nginx (reverse proxy + SSL + static files)
+- [x] .env.example com todas as variáveis
+- [x] scripts: setup.sh (local), deploy.sh (VPS), backup.sh (VPS)
+- [x] GitHub Actions: CI (lint + test) + CD (build + deploy VPS)
 
 ### Resiliência (whatsapp-web.js)
 - [ ] reconexão automática ao desconectar
@@ -201,7 +204,6 @@ services:
 
 ### Futuro (pós-MVP)
 - [ ] migração para Meta Cloud API (trocar módulo `whatsapp`)
-- [ ] autenticação JWT completa
 - [ ] Webhooks Meta
 - [ ] CI/CD maduro com blue-green
 
