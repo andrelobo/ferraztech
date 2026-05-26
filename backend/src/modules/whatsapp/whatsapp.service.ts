@@ -1,5 +1,7 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { InjectQueue } from '@nestjs/bullmq'
+import { Queue } from 'bullmq'
 import { WhatsAppSession } from './whatsapp.session'
 import { BotService } from '../bot/bot.service'
 import { ConversationsService } from '../conversations/conversations.service'
@@ -13,6 +15,7 @@ export class WhatsAppService implements OnModuleInit {
 
   constructor(
     private configService: ConfigService,
+    @InjectQueue('whatsapp') private whatsappQueue: Queue,
     private botService: BotService,
     private conversationsService: ConversationsService,
     private leadsService: LeadsService,
@@ -57,6 +60,7 @@ export class WhatsAppService implements OnModuleInit {
         }
       }
     }
+    await this.whatsappQueue.add('send', { to, message })
     return { queued: true, to, message }
   }
 

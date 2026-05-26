@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
+import { getQueueToken } from '@nestjs/bullmq'
 import { WhatsAppService } from './whatsapp.service'
 import { WhatsAppController } from './whatsapp.controller'
 import { BotService } from '../bot/bot.service'
@@ -38,6 +39,10 @@ describe('WhatsAppModule', () => {
     findAll: jest.fn(),
   }
 
+  const mockQueue = {
+    add: jest.fn(),
+  }
+
   beforeEach(async () => {
     jest.clearAllMocks()
 
@@ -48,6 +53,7 @@ describe('WhatsAppModule', () => {
         { provide: BotService, useValue: mockBotService },
         { provide: ConversationsService, useValue: mockConversationsService },
         { provide: LeadsService, useValue: mockLeadsService },
+        { provide: getQueueToken('whatsapp'), useValue: mockQueue },
         {
           provide: ConfigService,
           useValue: {
