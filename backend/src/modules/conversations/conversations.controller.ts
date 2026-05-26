@@ -1,6 +1,8 @@
-import { Controller, Get, Param } from '@nestjs/common'
+import { Controller, Get, Param, UseGuards } from '@nestjs/common'
 import { ConversationsService } from './conversations.service'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 
+@UseGuards(JwtAuthGuard)
 @Controller('conversations')
 export class ConversationsController {
   constructor(
