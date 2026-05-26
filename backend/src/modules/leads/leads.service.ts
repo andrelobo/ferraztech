@@ -31,6 +31,18 @@ export class LeadsService {
     return lead
   }
 
+  async findByPhone(phone: string): Promise<Lead | null> {
+    return this.leadModel.findOne({ phone }).exec()
+  }
+
+  async updateServiceType(id: string, serviceType: string): Promise<Lead> {
+    const lead = await this.leadModel
+      .findByIdAndUpdate(id, { serviceType }, { new: true })
+      .exec()
+    if (!lead) throw new NotFoundException('Lead not found')
+    return lead
+  }
+
   async updateStatus(id: string, dto: UpdateLeadStatusDto): Promise<Lead> {
     const lead = await this.leadModel
       .findByIdAndUpdate(id, { status: dto.status }, { new: true })
