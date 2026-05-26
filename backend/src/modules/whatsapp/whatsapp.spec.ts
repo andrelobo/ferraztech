@@ -98,20 +98,20 @@ describe('WhatsAppModule', () => {
     it('should return status via GET', () => {
       jest
         .spyOn(service, 'getStatus')
-        .mockReturnValue({ connected: true, qrCode: 'data:...' })
+        .mockReturnValue({ connected: true, qrCode: 'data:...', uptime: 0, retryCount: 0 })
       const result = controller.getStatus()
-      expect(result).toEqual({ connected: true, qrCode: 'data:...' })
+      expect(result).toEqual({ connected: true, qrCode: 'data:...', uptime: 0, retryCount: 0 })
     })
 
     it('should send message via POST', async () => {
       jest
         .spyOn(service, 'sendMessage')
-        .mockResolvedValue({ queued: true, to: '5511999999999' })
+        .mockResolvedValue({ queued: true, to: '5511999999999', message: 'Olá' })
       const result = await controller.sendMessage({
         to: '5511999999999',
         message: 'Olá',
       })
-      expect(result).toEqual({ queued: true, to: '5511999999999' })
+      expect(result).toEqual({ queued: true, to: '5511999999999', message: 'Olá' })
     })
   })
 })
