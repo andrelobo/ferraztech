@@ -1,4 +1,5 @@
 import { WhatsAppStatus } from '../components/WhatsAppStatus'
+import { SendMessage } from '../components/SendMessage'
 import { LeadsPage } from './LeadsPage'
 
 export function Dashboard() {
@@ -6,6 +7,7 @@ export function Dashboard() {
     <div>
       <h1>FerrazTech Admin</h1>
       <WhatsAppStatus />
+      <SendMessage />
       <LeadsPage />
     </div>
   )
