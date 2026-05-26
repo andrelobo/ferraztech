@@ -1,0 +1,23 @@
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import App from './App'
+
+vi.mock('./services/api', () => ({
+  default: {
+    get: vi.fn().mockResolvedValue({
+      data: { connected: true, qrCode: null, uptime: 100, retryCount: 0 },
+    }),
+  },
+}))
+
+describe('App', () => {
+  it('should render the dashboard title', async () => {
+    render(<App />)
+    expect(await screen.findByText('FerrazTech Admin')).toBeInTheDocument()
+  })
+
+  it('should render the WhatsApp status section', async () => {
+    render(<App />)
+    expect(await screen.findByText('WhatsApp')).toBeInTheDocument()
+  })
+})
