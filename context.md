@@ -53,6 +53,7 @@ Volume inicial: ~50 usuários/dia. Escabilidade futura planejada via Meta Cloud 
 - **health** — monitoramento da API
 - [x] **auth** — autenticação JWT (login, guard, strategy)
 - [x] **seed** — seed automático de admin user no bootstrap
+- **BullMQ** — fila de mensagens com Redis
 
 ## Collections MongoDB
 - leads
@@ -72,10 +73,11 @@ Volume inicial: ~50 usuários/dia. Escabilidade futura planejada via Meta Cloud 
 
 ## Funcionalidades do Dashboard
 - Visualizar/filtrar leads (status, tipo de serviço)
-- Histórico de conversas
+- Histórico de conversas (modal com detalhes do lead)
 - Alterar status de atendimento
-- Enviar mensagens manualmente
-- Status da conexão WhatsApp
+- Enviar mensagens manualmente (painel dedicado)
+- Status da conexão WhatsApp (multi-session)
+- Login com JWT + rota protegida
 
 ---
 
@@ -164,13 +166,13 @@ services:
 ### Backend (NestJS)
 - [x] setup do projeto NestJS com TypeScript
 - [x] conexão com MongoDB Atlas (Mongoose)
-- [ ] módulo `whatsapp` — integração whatsapp-web.js com reconexão automática, multi-session, heartbeat, persistência de sessão em disco + MongoDB
-- [ ] módulo `bot` — fluxos/menus automáticos (lógica de atendimento)
-- [ ] módulo `leads` — CRUD + filtros + status
-- [ ] módulo `conversations` — histórico de mensagens
-- [ ] módulo `health` — health check da API + status do WhatsApp + uptime
-- [ ] rate limiting interno com fila de mensagens (Bull ou similar)
-- [ ] retry com backoff exponencial
+- [x] módulo `whatsapp` — integração whatsapp-web.js com reconexão automática, multi-session, heartbeat, persistência de sessão em disco + MongoDB
+- [x] módulo `bot` — fluxos/menus automáticos (lógica de atendimento)
+- [x] módulo `leads` — CRUD + filtros + status
+- [x] módulo `conversations` — histórico de mensagens
+- [x] módulo `health` — health check da API + status do WhatsApp + uptime
+- [x] rate limiting com BullMQ + Redis
+- [x] retry com backoff via BullMQ (retentativas automáticas)
 - [x] DTOs, pipes, guards, validação (class-validator)
 - [x] helmet + CORS configurados
 - [x] Dockerfile multi-stage (dev + prod)
@@ -179,9 +181,9 @@ services:
 - [x] setup React + TypeScript + Vite
 - [x] tela de login (admin) com JWT
 - [x] página de leads com tabela, filtros (status, serviço) e busca
-- [ ] modal de detalhes do lead + histórico da conversa
+- [x] modal de detalhes do lead + histórico da conversa
 - [x] ação de alterar status do lead
-- [ ] painel de envio manual de mensagem
+- [x] painel de envio manual de mensagem
 - [x] indicador de status da conexão WhatsApp (com pooling)
 - [x] consumo da API com axios + interceptors (token)
 
@@ -195,12 +197,12 @@ services:
 - [x] GitHub Actions: CI (lint + test) + CD (build + deploy VPS)
 
 ### Resiliência (whatsapp-web.js)
-- [ ] reconexão automática ao desconectar
-- [ ] multi-session (2-3 instâncias de backup) com failover
-- [ ] heartbeat a cada 30s no módulo health
-- [ ] fila de mensagens com rate limit
-- [ ] persistência de sessão em disco + fallback no MongoDB
-- [ ] retry exponencial em falhas de envio
+- [x] reconexão automática ao desconectar
+- [x] multi-session (2-3 instâncias de backup) com failover
+- [x] heartbeat via módulo health
+- [x] fila de mensagens BullMQ + Redis
+- [x] persistência de sessão em disco (LocalAuth)
+- [x] retry exponencial via BullMQ (backoff automático)
 
 ### Futuro (pós-MVP)
 - [ ] migração para Meta Cloud API (trocar módulo `whatsapp`)
