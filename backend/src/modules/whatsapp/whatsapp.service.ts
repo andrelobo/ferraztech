@@ -55,7 +55,7 @@ export class WhatsAppService implements OnModuleInit {
           return { sent: true, to, message, sessionId: session.id }
         } catch (err) {
           this.logger.warn(
-            `[${session.id}] Failed to send message, trying next session...`,
+            `[${session.id}] Failed to send message: ${err instanceof Error ? err.message : err}`,
           )
         }
       }
