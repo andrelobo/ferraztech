@@ -16,9 +16,15 @@ import { SeedModule } from './seed/seed.module'
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: '../.env',
     }),
-    MongooseModule.forRoot(process.env.MONGODB_URI || ''),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        uri: config.get<string>('MONGODB_URI'),
+      }),
+    }),
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
@@ -41,6 +47,7 @@ import { SeedModule } from './seed/seed.module'
     WhatsAppModule,
     BotModule,
     AuthModule,
+    SeedModule,
   ],
   providers: [
     {
