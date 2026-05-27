@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common'
 import { BotService } from './bot.service'
 import { ConversationsModule } from '../conversations/conversations.module'
-import { LeadsModule } from '../leads/leads.module'
 
 @Module({
-  imports: [LeadsModule, ConversationsModule],
+  imports: [ConversationsModule],
   providers: [BotService],
   exports: [BotService],
 })

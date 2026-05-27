@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
@@ -8,7 +8,7 @@ import { ConversationsService } from '../conversations/conversations.service'
 import { LeadsService } from '../leads/leads.service'
 
 @Injectable()
-export class WhatsAppService implements OnModuleInit {
+export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WhatsAppService.name)
   private sessions: WhatsAppSession[] = []
   private startTime = Date.now()
@@ -22,7 +22,8 @@ export class WhatsAppService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    const count = this.configService.get('WHATSAPP_SESSION_COUNT', 2)
+    const count = this.configService.get('WHATSAPP_SESSION_COUNT', 1)
+    this.logger.log(`🚀 Inicializando motor do WhatsApp com ${count} sessão(ões)`)
 
     for (let i = 1; i <= count; i++) {
       const session = new WhatsAppSession(
@@ -33,8 +34,15 @@ export class WhatsAppService implements OnModuleInit {
         ),
       )
       this.sessions.push(session)
+      this.logger.log(`🧩 Subindo ${session.id}`)
       await session.start()
     }
+  }
+
+  async onModuleDestroy() {
+    this.logger.log('🛑 Encerrando sessões do WhatsApp...')
+    await Promise.all(this.sessions.map((s) => s.stop()))
+    this.sessions = []
   }
 
   getStatus() {
@@ -48,32 +56,62 @@ export class WhatsAppService implements OnModuleInit {
   }
 
   async sendMessage(to: string, message: string) {
-    for (const session of this.sessions) {
-      if (session.state.connected) {
-        try {
-          await session.sendMessage(to, message)
-          return { sent: true, to, message, sessionId: session.id }
-        } catch (err) {
-          this.logger.warn(
-            `[${session.id}] Failed to send message: ${err instanceof Error ? err.message : err}`,
-          )
-        }
+    const connectedSessions = this.sessions.filter((session) => session.state.connected)
+    let lastError: unknown = null
+
+    for (const session of connectedSessions) {
+      try {
+        await session.sendMessage(to, message)
+        this.logger.log(`📤 Mensagem enviada para ${to} via ${session.id}`)
+        return { sent: true, to, message, sessionId: session.id }
+      } catch (err) {
+        lastError = err
+        this.logger.warn(
+          `⚠️ [${session.id}] Falha ao enviar mensagem para ${to}: ${err instanceof Error ? err.message : err}`,
+        )
       }
     }
-    await this.whatsappQueue.add('send', { to, message })
-    return { queued: true, to, message }
+
+    if (connectedSessions.length === 0) {
+      this.logger.warn(`📬 Nenhuma sessão conectada. Mensagem para ${to} foi para a fila`)
+      await this.whatsappQueue.add('send', { to, message })
+      return { queued: true, to, message }
+    }
+
+    throw this.mapSendFailure(to, lastError)
+  }
+
+  private mapSendFailure(to: string, error: unknown) {
+    if (error instanceof Error) {
+      if (
+        error.message.includes('WhatsApp number not found') ||
+        error.message.includes('No LID for user')
+      ) {
+        return new BadRequestException(
+          `Nao foi possivel localizar o numero ${to} no WhatsApp para envio.`,
+        )
+      }
+    }
+
+    return new BadRequestException(
+      `Falha ao enviar mensagem para ${to}. Verifique o numero e a sessao do WhatsApp.`,
+    )
   }
 
   private async handleIncomingMessage(from: string, body: string) {
+    this.logger.log(`📨 Mensagem recebida de ${from}: len=${body.length}`)
     let conversation = await this.conversationsService.findByPhone(from)
+    const isNewContact = !conversation
 
-    if (!conversation) {
+    if (isNewContact) {
+      this.logger.log(`🆕 Novo contato detectado: ${from}`)
       const lead = await this.leadsService.create({
         name: from,
         phone: from,
         serviceType: 'indefinido',
       })
       conversation = await this.conversationsService.create(from, (lead as any)._id.toString())
+      this.logger.log(`🧲 Lead e conversa criados para ${from}`)
     }
 
     await this.conversationsService.addMessage(
@@ -86,7 +124,10 @@ export class WhatsAppService implements OnModuleInit {
       from,
       body,
       name: from,
+    }, {
+      isNewContact,
     })
+    this.logger.log(`🤖 Resposta gerada para ${from}${reply.action ? ` action=${reply.action}` : ''}`)
 
     const sendResult = await this.sendMessage(from, reply.reply)
 
@@ -96,12 +137,14 @@ export class WhatsAppService implements OnModuleInit {
         'bot',
         reply.reply,
       )
+      this.logger.log(`📝 Resposta do bot persistida para ${from}`)
     }
 
     if (reply.action && reply.action !== 'indefinido') {
       const lead = await this.leadsService.findByPhone(from)
       if (lead) {
         await this.leadsService.updateServiceType((lead as any)._id.toString(), reply.action)
+        this.logger.log(`🏷️ Serviço do lead ${from} atualizado para ${reply.action}`)
       }
     }
   }

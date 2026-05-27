@@ -43,37 +43,69 @@ export function LeadDetailModal({ lead, onClose }: Props) {
   }, [lead.phone])
 
   return (
-    <div>
-      <div>
-        <h2>{lead.name}</h2>
-        <button onClick={onClose}>Fechar</button>
-      </div>
-
-      <div>
-        <p><strong>Telefone:</strong> {lead.phone}</p>
-        {lead.email && <p><strong>Email:</strong> {lead.email}</p>}
-        <p><strong>Serviço:</strong> {lead.serviceType}</p>
-        <p><strong>Status:</strong> {statusLabels[lead.status] || lead.status}</p>
-        <p><strong>Data:</strong> {new Date(lead.createdAt).toLocaleString('pt-BR')}</p>
-      </div>
-
-      <div>
-        <h3>Conversa</h3>
-        {loading && <p>Carregando...</p>}
-        {!loading && messages.length === 0 && (
-          <p>Nenhuma mensagem encontrada</p>
-        )}
-        {!loading && messages.length > 0 && (
+    <div className="modal-backdrop">
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="lead-detail-title">
+        <div className="modal-header">
           <div>
-            {messages.map((msg) => (
-              <div key={msg._id}>
-                <strong>{msg.role === 'user' ? 'Cliente' : 'Bot'}:</strong>
-                <p>{msg.content}</p>
-                <small>{new Date(msg.timestamp).toLocaleString('pt-BR')}</small>
-              </div>
-            ))}
+            <p className="eyebrow">Historico do Lead</p>
+            <h2 id="lead-detail-title">{lead.name}</h2>
           </div>
-        )}
+          <button className="button-secondary button-compact" onClick={onClose}>Fechar</button>
+        </div>
+
+        <div className="modal-meta">
+          <div className="meta-chip">
+            <span>Telefone</span>
+            <strong>{lead.phone}</strong>
+          </div>
+          {lead.email && (
+            <div className="meta-chip">
+              <span>Email</span>
+              <strong>{lead.email}</strong>
+            </div>
+          )}
+          <div className="meta-chip">
+            <span>Servico</span>
+            <strong>{lead.serviceType}</strong>
+          </div>
+          <div className="meta-chip">
+            <span>Status</span>
+            <strong>{statusLabels[lead.status] || lead.status}</strong>
+          </div>
+          <div className="meta-chip">
+            <span>Data</span>
+            <strong>{new Date(lead.createdAt).toLocaleString('pt-BR')}</strong>
+          </div>
+        </div>
+
+        <div className="conversation-panel">
+          <div className="panel-header panel-header--tight">
+            <div>
+              <p className="eyebrow">Conversa</p>
+              <h3>Linha do tempo</h3>
+            </div>
+          </div>
+
+          {loading && <p>Carregando...</p>}
+          {!loading && messages.length === 0 && (
+            <p>Nenhuma mensagem encontrada</p>
+          )}
+          {!loading && messages.length > 0 && (
+            <div className="conversation-list">
+              {messages.map((msg) => (
+                <article
+                  className="message-bubble"
+                  data-role={msg.role}
+                  key={msg._id}
+                >
+                  <strong>{msg.role === 'user' ? 'Cliente' : 'Bot'}</strong>
+                  <p>{msg.content}</p>
+                  <small>{new Date(msg.timestamp).toLocaleString('pt-BR')}</small>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

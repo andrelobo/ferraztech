@@ -1,16 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { getModelToken } from '@nestjs/mongoose'
 import { BotService } from './bot.service'
 import { ConversationsService } from '../conversations/conversations.service'
-import { LeadsService } from '../leads/leads.service'
 
 describe('BotModule', () => {
   let service: BotService
-
-  const mockLeadsService = {
-    create: jest.fn(),
-    findAll: jest.fn(),
-  }
 
   const mockConversationsService = {
     findByPhone: jest.fn(),
@@ -21,7 +14,6 @@ describe('BotModule', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BotService,
-        { provide: LeadsService, useValue: mockLeadsService },
         {
           provide: ConversationsService,
           useValue: mockConversationsService,
@@ -45,25 +37,100 @@ describe('BotModule', () => {
       })
 
       expect(result).toHaveProperty('reply')
-      expect(result.reply).toContain('Bem-vindo')
+      expect(result.reply).toContain('Seja bem-vindo à *Ferraz Tech*')
+      expect(result.reply).toContain('desbloqueio do seu telefone')
     })
 
-    it('should route to menu option 1', async () => {
-      const result = await service.processMenuOption('1', '5511999999999')
-      expect(result).toHaveProperty('reply')
-      expect(result.reply).toContain('consultoria')
+    it('should return welcome message when new contact is flagged by caller', async () => {
+      mockConversationsService.findByPhone.mockResolvedValue({ _id: 'conversation-1' })
+
+      const result = await service.processMessage(
+        {
+          from: '5511999999999',
+          body: 'Olá',
+          name: 'João',
+        },
+        { isNewContact: true },
+      )
+
+      expect(result.reply).toContain('desbloqueio do seu telefone')
     })
 
-    it('should route to menu option 2', async () => {
-      const result = await service.processMenuOption('2', '5511999999999')
-      expect(result).toHaveProperty('reply')
-      expect(result.reply).toContain('orçamento')
+    it('should ask for IMEI after the welcome message was already sent', async () => {
+      mockConversationsService.findByPhone.mockResolvedValue({ _id: 'conversation-1' })
+      mockConversationsService.getMessages.mockResolvedValue([
+        { role: 'user', content: 'Oi' },
+        { role: 'bot', content: 'Olá, bem-vindo ao Ferraz Tech...' },
+        { role: 'user', content: 'Meu telefone foi bloqueado' },
+      ])
+
+      const result = await service.processMessage({
+        from: '5511999999999',
+        body: 'Meu telefone foi bloqueado',
+        name: 'João',
+      })
+
+      expect(result.reply).toContain('envie o *IMEI* do telefone')
+      expect(result.reply).toContain('atendimento humano')
+      expect(result.reply).toContain('bandeja do chip')
+      expect(result.reply).toContain('gavetinha do chip')
+      expect(result.reply).toContain('chip virtual')
     })
 
-    it('should return main menu for unknown option', async () => {
-      const result = await service.processMenuOption('99', '5511999999999')
-      expect(result).toHaveProperty('reply')
-      expect(result.reply).toContain('inválida')
+    it('should confirm IMEI receipt after the bot already requested it', async () => {
+      mockConversationsService.findByPhone.mockResolvedValue({ _id: 'conversation-1' })
+      mockConversationsService.getMessages.mockResolvedValue([
+        { role: 'user', content: 'Oi' },
+        { role: 'bot', content: 'Olá, bem-vindo ao Ferraz Tech...' },
+        { role: 'user', content: 'Meu telefone foi bloqueado' },
+        { role: 'bot', content: 'Para adiantar o seu serviço, envie o *IMEI* do telefone por aqui.' },
+      ])
+
+      const result = await service.processMessage({
+        from: '5511999999999',
+        body: 'IMEI 123456789012345',
+        name: 'João',
+      })
+
+      expect(result.reply).toContain('Recebi o *IMEI*')
+      expect(result.reply).toContain('atendimento humano')
+      expect(result.reply).toContain('até *3 minutos*')
+    })
+
+    it('should send a short reminder when still waiting for the IMEI', async () => {
+      mockConversationsService.findByPhone.mockResolvedValue({ _id: 'conversation-1' })
+      mockConversationsService.getMessages.mockResolvedValue([
+        { role: 'user', content: 'Oi' },
+        { role: 'bot', content: 'Olá, bem-vindo ao Ferraz Tech...' },
+        { role: 'user', content: 'Meu telefone foi bloqueado' },
+        { role: 'bot', content: 'Para adiantar o seu serviço, envie o *IMEI* do telefone por aqui.' },
+      ])
+
+      const result = await service.processMessage({
+        from: '5511999999999',
+        body: 'Ainda não achei',
+        name: 'João',
+      })
+
+      expect(result.reply).toContain('Ainda estou aguardando o *IMEI*')
+      expect(result.reply).toContain('bandeja do chip')
+      expect(result.reply).toContain('chip virtual')
+      expect(result.reply).not.toContain('Perfeito. A próxima etapa será com o atendimento humano.')
+    })
+
+    it('should send the welcome message again when conversation has no prior bot reply', async () => {
+      mockConversationsService.findByPhone.mockResolvedValue({ _id: 'conversation-1' })
+      mockConversationsService.getMessages.mockResolvedValue([
+        { role: 'user', content: 'Oi' },
+      ])
+
+      const result = await service.processMessage({
+        from: '5511999999999',
+        body: 'Oi',
+        name: 'João',
+      })
+
+      expect(result.reply).toContain('qual é a sua dúvida')
     })
   })
 })

@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { BullModule } from '@nestjs/bullmq'
 import { APP_GUARD } from '@nestjs/core'
+import { APP_INTERCEPTOR } from '@nestjs/core'
 import { HealthModule } from './modules/health/health.module'
 import { LeadsModule } from './modules/leads/leads.module'
 import { ConversationsModule } from './modules/conversations/conversations.module'
@@ -11,6 +12,7 @@ import { WhatsAppModule } from './modules/whatsapp/whatsapp.module'
 import { BotModule } from './modules/bot/bot.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { SeedModule } from './seed/seed.module'
+import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor'
 
 @Module({
   imports: [
@@ -53,6 +55,10 @@ import { SeedModule } from './seed/seed.module'
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestLoggingInterceptor,
     },
   ],
 })
