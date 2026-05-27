@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import QRCode from 'qrcode'
 import api from '../services/api'
 
 interface SessionStatus {
@@ -13,6 +14,18 @@ interface MultiStatus {
   sessions: SessionStatus[]
   activeSession: string | null
   uptime: number
+}
+
+function QrDisplay({ data }: { data: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    if (canvasRef.current) {
+      QRCode.toCanvas(canvasRef.current, data, { width: 256 })
+    }
+  }, [data])
+
+  return <canvas ref={canvasRef} />
 }
 
 export function WhatsAppStatus() {
@@ -45,13 +58,19 @@ export function WhatsAppStatus() {
       </p>
       {connected && <p>Sessão ativa: {status.activeSession}</p>}
       {status.uptime ? <p>Uptime: {status.uptime}s</p> : null}
-      {status.sessions.map((s) =>
-        s.retryCount > 0 ? (
-          <p key={s.id}>
-            {s.id}: {s.retryCount} tentativas de reconexão
-          </p>
-        ) : null,
-      )}
+      {status.sessions.map((s) => {
+        if (s.connected) return null
+        return (
+          <div key={s.id} style={{ margin: '1rem 0' }}>
+            <p>
+              <strong>{s.id}</strong>
+              {s.retryCount > 0 && ` — ${s.retryCount} tentativas de reconexão`}
+            </p>
+            {s.qrCode && <QrDisplay data={s.qrCode} />}
+            {!s.qrCode && <p>Aguardando QR code...</p>}
+          </div>
+        )
+      })}
     </div>
   )
 }
