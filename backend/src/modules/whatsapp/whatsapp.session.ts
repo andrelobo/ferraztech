@@ -96,6 +96,7 @@ export class WhatsAppSession {
     })
 
     this.client.on('message', (msg) => {
+      if (!msg.from.endsWith('@c.us') || msg.from === 'status@broadcast') return
       const from = msg.from.replace('@c.us', '').replace('@s.whatsapp.net', '')
       this.onIncomingMessage(from, msg.body)
     })
