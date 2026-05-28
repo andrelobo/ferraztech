@@ -38,6 +38,7 @@ URLs:
 ```bash
 cd "/home/lobo/Área de trabalho/KODE/ferraztech/backend"
 npm test -- --runInBand
+npm run test:e2e
 ```
 
 ### Admin
@@ -48,7 +49,7 @@ npm run build
 ```
 
 Observação:
-- `npm run test:e2e` no backend ainda não roda porque o arquivo `test/jest-e2e.json` não existe no estado atual do repo
+- o backend agora tem um e2e mínimo para `health`, útil para validar o bootstrap básico do Nest sem depender de Mongo ou Redis
 
 ## Docker Compose
 
