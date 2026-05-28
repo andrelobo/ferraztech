@@ -1,6 +1,6 @@
 # FERRAZTECH — Estado Atual
 
-Atualizado em: `2026-05-27`
+Atualizado em: `2026-05-28`
 
 ## Resumo executivo
 - O fluxo principal `WhatsApp -> backend -> bot -> resposta -> histórico` já foi validado com mensagem real.
@@ -53,13 +53,14 @@ Atualizado em: `2026-05-27`
 - backend:
   - `npm test -- --runInBand`
   - status mais recente: `56/56` testes passando
+  - `npm run test:e2e`
+  - status mais recente: `1/1` suíte e2e passando
 - admin:
   - `npm test`
   - status mais recente: `30/30` testes passando
   - `npm run build` passando
 
 ## Gaps conhecidos
-- `backend npm run test:e2e` está quebrado porque `./test/jest-e2e.json` não existe
 - `docker-compose.yml` não tem profile `test`
 - o modo development do compose não monta `backend/src`, então hot reload real do backend não está garantido no container
 - `scripts/backup.sh` não existe no repo, apesar de versões antigas do contexto mencionarem isso
@@ -88,6 +89,7 @@ npm run dev
 ```bash
 cd "/home/lobo/Área de trabalho/KODE/ferraztech/backend"
 npm test -- --runInBand
+npm run test:e2e
 ```
 
 ```bash
