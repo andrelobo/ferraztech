@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
 import { getQueueToken } from '@nestjs/bullmq'
+import { BadRequestException } from '@nestjs/common'
 import { WhatsAppService } from './whatsapp.service'
 import { WhatsAppController } from './whatsapp.controller'
 import { BotService } from '../bot/bot.service'
@@ -10,11 +11,16 @@ import { LeadsService } from '../leads/leads.service'
 const mockClient = {
   on: jest.fn(),
   initialize: jest.fn(),
+  getNumberId: jest.fn(),
   sendMessage: jest.fn(),
   getState: jest.fn(),
   destroy: jest.fn(),
   once: jest.fn(),
 }
+
+jest.mock('child_process', () => ({
+  execSync: jest.fn(),
+}))
 
 jest.mock('whatsapp-web.js', () => ({
   Client: jest.fn().mockImplementation(() => mockClient),
@@ -32,11 +38,15 @@ describe('WhatsAppModule', () => {
 
   const mockConversationsService = {
     findByPhone: jest.fn(),
+    create: jest.fn(),
+    addMessage: jest.fn(),
   }
 
   const mockLeadsService = {
     create: jest.fn(),
     findAll: jest.fn(),
+    findByPhone: jest.fn(),
+    updateServiceType: jest.fn(),
   }
 
   const mockQueue = {
@@ -60,7 +70,7 @@ describe('WhatsAppModule', () => {
             get: jest.fn((key: string) => {
               const config: Record<string, string> = {
                 WHATSAPP_SESSION_PATH: './sessions',
-                WHATSAPP_SESSION_COUNT: '2',
+                WHATSAPP_SESSION_COUNT: '1',
                 WHATSAPP_MAX_RETRIES: '5',
                 WHATSAPP_RETRY_DELAY_MS: '5000',
               }
@@ -81,12 +91,11 @@ describe('WhatsAppModule', () => {
       expect(service).toBeDefined()
     })
 
-    it('should create multiple sessions on init', async () => {
+    it('should create the configured number of sessions on init', async () => {
       await service.onModuleInit()
       const status = service.getStatus()
-      expect(status.sessions).toHaveLength(2)
+      expect(status.sessions).toHaveLength(1)
       expect(status.sessions[0]).toHaveProperty('id', 'session-1')
-      expect(status.sessions[1]).toHaveProperty('id', 'session-2')
     })
 
     it('should return aggregated status with all sessions', () => {
@@ -144,6 +153,43 @@ describe('WhatsAppModule', () => {
       const result = await service.sendMessage('5511999999999', 'Olá')
       expect(mockSession.sendMessage).not.toHaveBeenCalled()
       expect(result).toEqual({ queued: true, to: '5511999999999', message: 'Olá' })
+    })
+
+    it('should not queue when a connected session fails to resolve or send', async () => {
+      const mockSession = {
+        id: 'session-1',
+        state: { id: 'session-1', connected: true },
+        sendMessage: jest.fn().mockRejectedValue(new Error('WhatsApp number not found: 5511999999999')),
+      }
+      jest.replaceProperty(service as any, 'sessions', [mockSession])
+
+      await expect(service.sendMessage('5511999999999', 'Olá')).rejects.toThrow(BadRequestException)
+      expect(mockQueue.add).not.toHaveBeenCalled()
+    })
+
+    it('should flag first incoming message as new contact for the bot flow', async () => {
+      mockConversationsService.findByPhone.mockResolvedValueOnce(null)
+      mockConversationsService.create.mockResolvedValue({ _id: 'conversation-1' })
+      mockConversationsService.addMessage.mockResolvedValue({})
+      mockLeadsService.create.mockResolvedValue({ _id: 'lead-1' })
+      mockBotService.processMessage.mockResolvedValue({ reply: 'Bem-vindo à FERRAZTECH!' })
+      jest.spyOn(service, 'sendMessage').mockResolvedValue({
+        sent: true,
+        to: '5511999999999',
+        message: 'Bem-vindo à FERRAZTECH!',
+        sessionId: 'session-1',
+      })
+
+      await (service as any).handleIncomingMessage('5511999999999', 'Olá')
+
+      expect(mockBotService.processMessage).toHaveBeenCalledWith(
+        {
+          from: '5511999999999',
+          body: 'Olá',
+          name: '5511999999999',
+        },
+        { isNewContact: true },
+      )
     })
   })
 

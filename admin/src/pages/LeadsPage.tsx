@@ -41,85 +41,106 @@ export function LeadsPage() {
   }
 
   return (
-    <div>
-      <h1>Leads</h1>
+    <section className="panel leads-panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Pipeline</p>
+          <h2>Leads</h2>
+          <p className="section-copy">
+            Filtre a fila de atendimento e abra o historico completo da
+            conversa antes de responder.
+          </p>
+        </div>
+        <div className="stat-badge">
+          {loading ? 'Atualizando...' : `${leads.length} lead${leads.length === 1 ? '' : 's'}`}
+        </div>
+      </div>
 
-      <div>
-        <label htmlFor="statusFilter">Status</label>
-        <select
-          id="statusFilter"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">Todos</option>
-          <option value="new">Novo</option>
-          <option value="contacted">Contactado</option>
-          <option value="qualified">Qualificado</option>
-          <option value="converted">Convertido</option>
-          <option value="lost">Perdido</option>
-        </select>
+      <div className="filters-row">
+        <div className="field field--compact">
+          <label htmlFor="statusFilter">Status</label>
+          <select
+            id="statusFilter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">Todos</option>
+            <option value="new">Novo</option>
+            <option value="contacted">Contactado</option>
+            <option value="qualified">Qualificado</option>
+            <option value="converted">Convertido</option>
+            <option value="lost">Perdido</option>
+          </select>
+        </div>
 
-        <label htmlFor="serviceFilter">Serviço</label>
-        <select
-          id="serviceFilter"
-          value={serviceFilter}
-          onChange={(e) => setServiceFilter(e.target.value)}
-        >
-          <option value="">Todos</option>
-          <option value="consultoria">Consultoria</option>
-          <option value="orcamento">Orçamento</option>
-          <option value="suporte">Suporte</option>
-        </select>
+        <div className="field field--compact">
+          <label htmlFor="serviceFilter">Serviço</label>
+          <select
+            id="serviceFilter"
+            value={serviceFilter}
+            onChange={(e) => setServiceFilter(e.target.value)}
+          >
+            <option value="">Todos</option>
+            <option value="consultoria">Consultoria</option>
+            <option value="orcamento">Orçamento</option>
+            <option value="suporte">Suporte</option>
+          </select>
+        </div>
       </div>
 
       {loading && <div>Carregando...</div>}
 
       {!loading && leads.length === 0 && (
-        <div>
+        <div className="empty-state">
           <p>Nenhum lead encontrado</p>
         </div>
       )}
 
       {!loading && leads.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Telefone</th>
-              <th>Serviço</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {leads.map((lead) => (
-              <tr key={lead._id}>
-                <td>{lead.name}</td>
-                <td>{lead.phone}</td>
-                <td>{lead.serviceType}</td>
-                <td>
-                  <select
-                    value={lead.status}
-                    onChange={(e) =>
-                      handleStatusChange(lead._id, e.target.value)
-                    }
-                  >
-                    <option value="new">Novo</option>
-                    <option value="contacted">Contactado</option>
-                    <option value="qualified">Qualificado</option>
-                    <option value="converted">Convertido</option>
-                    <option value="lost">Perdido</option>
-                  </select>
-                </td>
-                <td>
-                  <button onClick={() => setSelectedLead(lead)}>
-                    Detalhes
-                  </button>
-                </td>
+        <div className="table-card">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Telefone</th>
+                <th>Serviço</th>
+                <th>Status</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {leads.map((lead) => (
+                <tr key={lead._id}>
+                  <td>{lead.name}</td>
+                  <td>{lead.phone}</td>
+                  <td>{lead.serviceType}</td>
+                  <td>
+                    <select
+                      value={lead.status}
+                      onChange={(e) =>
+                        handleStatusChange(lead._id, e.target.value)
+                      }
+                    >
+                      <option value="new">Novo</option>
+                      <option value="contacted">Contactado</option>
+                      <option value="qualified">Qualificado</option>
+                      <option value="converted">Convertido</option>
+                      <option value="lost">Perdido</option>
+                    </select>
+                  </td>
+                  <td>
+                    <button
+                      className="button-secondary button-compact"
+                      onClick={() => setSelectedLead(lead)}
+                    >
+                      Detalhes
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {selectedLead && (
@@ -128,6 +149,6 @@ export function LeadsPage() {
           onClose={() => setSelectedLead(null)}
         />
       )}
-    </div>
+    </section>
   )
 }

@@ -32,10 +32,20 @@ export function SendMessage() {
   }
 
   return (
-    <div>
-      <h2>Enviar Mensagem</h2>
-      <form onSubmit={handleSubmit}>
+    <section className="panel composer-panel">
+      <div className="panel-header">
         <div>
+          <p className="eyebrow">Resposta Manual</p>
+          <h2>Enviar Mensagem</h2>
+          <p className="section-copy">
+            Use este atalho para responder rapido quando o atendimento humano
+            assumir a conversa.
+          </p>
+        </div>
+      </div>
+
+      <form className="stack-form" onSubmit={handleSubmit}>
+        <div className="field">
           <label htmlFor="phone">Telefone</label>
           <input
             id="phone"
@@ -46,7 +56,7 @@ export function SendMessage() {
             required
           />
         </div>
-        <div>
+        <div className="field">
           <label htmlFor="message">Mensagem</label>
           <textarea
             id="message"
@@ -56,14 +66,14 @@ export function SendMessage() {
           />
         </div>
         {feedback && (
-          <p style={{ color: feedback.type === 'success' ? 'green' : 'red' }}>
+          <p className="form-feedback" data-feedback={feedback.type}>
             {feedback.text}
           </p>
         )}
-        <button type="submit" disabled={loading}>
+        <button className="button-primary" type="submit" disabled={loading}>
           {loading ? 'Enviando...' : 'Enviar'}
         </button>
       </form>
-    </div>
+    </section>
   )
 }

@@ -1,10 +1,13 @@
 import { NestFactory } from '@nestjs/core'
-import { ValidationPipe } from '@nestjs/common'
+import { Logger, ValidationPipe } from '@nestjs/common'
 import helmet from 'helmet'
 import { AppModule } from './app.module'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create(AppModule, {
+    logger: ['log', 'error', 'warn', 'debug', 'verbose'],
+  })
+  const logger = new Logger('Bootstrap')
 
   app.use(helmet())
 
@@ -25,6 +28,9 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000
   await app.listen(port)
-  console.log(`🚀 FerrazTech API running on port ${port}`)
+  logger.log(`🚀 FerrazTech API rodando na porta ${port}`)
+  logger.log(`🌍 CORS liberado para: ${process.env.CORS_ORIGIN || '*'}`)
+  logger.log(`🧪 Ambiente: ${process.env.NODE_ENV || 'development'}`)
+  logger.log('📡 Observabilidade HTTP ativa com logs de request/response')
 }
 bootstrap()

@@ -3,5 +3,8 @@ dist/
 .env
 *.log
 data/whatsapp-sessions/
+backend/sessions/
+backend/.wwebjs_cache/
+dump.rdb
 *.pid
 coverage/

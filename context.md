@@ -1,257 +1,149 @@
-# FERRAZTECH — Contexto do Projeto
+# FERRAZTECH — Contexto Canônico
 
 ## O que é
 MVP de atendimento automatizado via WhatsApp para a FERRAZTECH.
-Volume inicial: ~50 usuários/dia. Escabilidade futura planejada via Meta Cloud API.
 
-## Fluxo de desenvolvimento
-1. Desenvolvimento local com docker-compose (dev)
-2. Testes locais completos
-3. Deploy para VPS com os mesmos containers (prod)
+Objetivo atual:
+- validar um fluxo funcional de atendimento para desbloqueio de iPhone
+- operar com `1` sessão de WhatsApp por padrão
+- manter o painel admin simples, observável e utilizável
 
-## Stack
+Escala inicial esperada:
+- aproximadamente `50` atendimentos por dia
+
+Evolução planejada:
+- manter o MVP em `whatsapp-web.js`
+- migrar no futuro para `Meta Cloud API`
+
+## Stack real do projeto
 | Camada | Tecnologia |
 |---|---|
 | Backend | NestJS + TypeScript |
-| Banco | MongoDB Atlas (cloud) |
-| WhatsApp | whatsapp-web.js (MVP) → Meta Cloud API (futuro) |
-| Frontend | React Admin Dashboard (build estático) |
-| Reverse Proxy | Nginx |
-| Container | Docker + docker-compose |
-| VPS | Ubuntu 22.04+ |
-| SSL | Let's Encrypt (certbot) |
-| CI/CD | GitHub Actions |
-| Monitoramento | Uptime Kuma / Healthchecks.io |
+| Banco | MongoDB Atlas |
+| WhatsApp | whatsapp-web.js |
+| Fila | BullMQ + Redis |
+| Frontend | React + Vite + TypeScript |
+| Proxy local do front | Vite proxy para `/api` |
+| Proxy de produção | Nginx |
+| Containers | Docker + docker-compose |
 
-## Arquitetura (produção)
+## Arquitetura atual
+- O backend sobe em `http://localhost:3000` e expõe tudo sob prefixo `/api`.
+- O admin sobe em `http://localhost:5173` e consome a API via `baseURL: /api`.
+- Em desenvolvimento local, o caminho mais confiável hoje é:
+  - backend por `npm run start` ou `npm run start:dev`
+  - admin por `npm run dev`
+- O `docker-compose.yml` existe e sobe `redis`, `backend`, `admin` e `nginx`, mas o modo development atual não entrega hot reload real do backend porque não monta `src` no container.
 
-```
-                     ┌──────────────┐
-                     │  MongoDB     │
-                     │  Atlas       │
-                     └──────┬───────┘
-                            │
-       ┌────────────┐      ┌┴───────────────┐      ┌────────────────┐
-       │ WhatsApp   │◄────►│  NestJS API    │◄────►│  React Admin   │
-       │ Web (QR)   │      │  (container)   │      │  (nginx static)│
-       └────────────┘      └────────────────┘      └────────────────┘
-                                  │
-                          ┌───────┴───────┐
-                          │   Nginx       │
-                          │  (proxy + SSL)│
-                          └───────┬───────┘
-                                  │
-                            Internet (VPS)
+## Backend — módulos reais
+- `auth` — login JWT, guard e strategy
+- `seed` — cria admin inicial se não existir
+- `whatsapp` — sessão do WhatsApp, QR, envio, fila, reconexão
+- `bot` — fluxo automatizado de atendimento
+- `leads` — CRUD e status de leads
+- `conversations` — histórico de mensagens por telefone
+- `health` — status da API
+- `common/interceptors` — observabilidade HTTP
 
-```
+## Frontend — áreas reais
+- login admin
+- dashboard principal
+- status do WhatsApp com polling
+- exibição de QR code via endpoint do backend
+- envio manual de mensagem
+- lista de leads com filtros
+- modal de histórico da conversa
 
-## Módulos do Backend
-- **whatsapp** — conexão e gerenciamento do whatsapp-web.js
-- **bot** — fluxos e menus automatizados
-- **leads** — CRUD e gestão de leads
-- **conversations** — histórico de mensagens
-- **health** — monitoramento da API
-- [x] **auth** — autenticação JWT (login, guard, strategy)
-- [x] **seed** — seed automático de admin user no bootstrap
-- **BullMQ** — fila de mensagens com Redis
+## Fluxo atual do bot
+1. Primeiro contato:
+   - saudação curta
+   - foco em `desbloqueio do telefone`
+2. Segunda etapa:
+   - pede o `IMEI`
+   - orienta procurar na `bandeja do chip (gavetinha do chip)`
+   - avisa sobre aparelhos com `chip virtual`
+3. Se o cliente ainda não mandar IMEI:
+   - envia lembrete curto
+4. Se o cliente mandar um IMEI válido:
+   - confirma recebimento
+   - orienta aguardar atendimento humano
 
-## Collections MongoDB
-- leads
-- conversations
-- messages
-- bot_sessions
-- users/admins
+Observação importante:
+- hoje o bot considera IMEI válido como qualquer sequência com `15` dígitos
 
-## Endpoints REST
-- `GET /health`
-- `GET /leads`, `GET /leads/:id`, `POST /leads`
-- `PATCH /leads/:id/status`
-- `GET /conversations`, `GET /conversations/:phone`
-- `POST /whatsapp/send-message`
-- `GET /whatsapp/status`
-- `POST /auth/login`
+## WhatsApp — estado de projeto
+- padrão atual: `WHATSAPP_SESSION_COUNT=1`
+- QR code é servido pelo backend em `GET /api/whatsapp/qr`
+- status da sessão é servido em `GET /api/whatsapp/status`
+- envio manual usa `POST /api/whatsapp/send-message`
+- a captura de inbound já contempla remetentes `@lid`, `@c.us` e `@s.whatsapp.net`
+- grupos e `status@broadcast` são ignorados
+- há logs em emoji no terminal do Nest para request, sessão e fluxo de mensagem
 
-## Funcionalidades do Dashboard
-- Visualizar/filtrar leads (status, tipo de serviço)
-- Histórico de conversas (modal com detalhes do lead)
-- Alterar status de atendimento
-- Enviar mensagens manualmente (painel dedicado)
-- Status da conexão WhatsApp (multi-session)
-- Login com JWT + rota protegida
+## Endpoints principais
+- `POST /api/auth/login`
+- `GET /api/health`
+- `GET /api/leads`
+- `GET /api/leads/:id`
+- `POST /api/leads`
+- `PATCH /api/leads/:id/status`
+- `GET /api/conversations`
+- `GET /api/conversations/:phone`
+- `GET /api/conversations/:phone/messages`
+- `GET /api/whatsapp/status`
+- `GET /api/whatsapp/qr`
+- `POST /api/whatsapp/send-message`
 
----
-
-## Estrutura de diretórios (local = VPS)
-
-```
+## Estrutura real relevante
+```text
 ferraztech/
-├── docker-compose.yml          # perfil dev (hot-reload) + prod
+├── context.md
+├── CURRENT_STATE.md
+├── README.md
+├── docker-compose.yml
 ├── .env.example
-├── .env                        # não versionado
 ├── backend/
 │   ├── Dockerfile
 │   ├── package.json
 │   └── src/
-│       ├── main.ts
 │       ├── app.module.ts
-│       ├── config/
+│       ├── main.ts
+│       ├── common/
 │       ├── modules/
-│       │   ├── whatsapp/
-│       │   ├── bot/
-│       │   ├── leads/
-│       │   ├── conversations/
-│       │   └── health/
-│       └── shared/
+│       └── seed/
 ├── admin/
 │   ├── Dockerfile
 │   ├── package.json
-│   ├── vite.config.ts
 │   └── src/
-│       ├── App.tsx
-│       ├── pages/
 │       ├── components/
-│       └── services/
+│       ├── pages/
+│       ├── services/
+│       └── styles.css
 ├── nginx/
-│   └── conf.d/
-│       └── ferraztech.conf
 ├── scripts/
 │   ├── setup.sh
-│   ├── backup.sh
 │   └── deploy.sh
 └── data/
-    └── whatsapp-sessions/      # persistência local (gitignored)
+    └── whatsapp-sessions/
 ```
 
-### docker-compose (dev × prod)
+## Diferenças importantes entre contexto antigo e código atual
+- O repo hoje **não** tem `scripts/backup.sh`.
+- O repo hoje **não** tem profile `test` funcional no `docker-compose.yml`.
+- O fluxo operacional atual está mais estável e simples em `1` sessão padrão, não em `2-3` sessões por default.
 
-```yaml
-services:
-  backend:
-    build:
-      context: ./backend
-      target: ${BUILD_TARGET:-development}
-    restart: always
-    env_file: .env
-    volumes:
-      # Dev: monta src para hot-reload
-      - ${BACKEND_SRC_MOUNT:-./backend/src:/app/src}
-      - ./data/whatsapp-sessions:/app/sessions
+## Validação esperada antes de avançar
+- backend:
+  - `cd "/home/lobo/Área de trabalho/KODE/ferraztech/backend"`
+  - `npm test -- --runInBand`
+  - `npm run test:e2e`
+- admin:
+  - `cd "/home/lobo/Área de trabalho/KODE/ferraztech/admin"`
+  - `npm test`
+  - `npm run build`
 
-  nginx:
-    image: nginx:alpine
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"              # só mapeado em prod
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/ssl:/etc/nginx/ssl   # só existe em prod
-      - ./admin/dist:/usr/share/nginx/html
-    profiles:
-      - production
-```
-
-- **Dev:** `BUILD_TARGET=development` → hot-reload com nodemon/ts-node, sem nginx (acessa backend direto na porta 3000)
-- **Prod:** `BUILD_TARGET=production` → build otimizado, nginx como reverse proxy + static files
-
-### Fluxo de trabalho
-1. **Desenvolvimento:** `docker compose up backend` com hot-reload, frontend em Vite standalone
-2. **Teste integrado:** `docker compose --profile test up` (backend + admin build local)
-3. **Deploy VPS:** `git push main` → GitHub Action → SSH → `docker compose pull && docker compose --profile production up -d`
-
----
-
-## Necessidades para Desenvolvimento
-
-### Backend (NestJS)
-- [x] setup do projeto NestJS com TypeScript
-- [x] conexão com MongoDB Atlas (Mongoose)
-- [x] módulo `whatsapp` — integração whatsapp-web.js com reconexão automática, multi-session, heartbeat, persistência de sessão em disco + MongoDB
-- [x] módulo `bot` — fluxos/menus automáticos (lógica de atendimento)
-- [x] módulo `leads` — CRUD + filtros + status
-- [x] módulo `conversations` — histórico de mensagens
-- [x] módulo `health` — health check da API + status do WhatsApp + uptime
-- [x] rate limiting com BullMQ + Redis
-- [x] retry com backoff via BullMQ (retentativas automáticas)
-- [x] DTOs, pipes, guards, validação (class-validator)
-- [x] helmet + CORS configurados
-- [x] Dockerfile multi-stage (dev + prod)
-
-### Frontend Admin (React)
-- [x] setup React + TypeScript + Vite
-- [x] tela de login (admin) com JWT
-- [x] página de leads com tabela, filtros (status, serviço) e busca
-- [x] modal de detalhes do lead + histórico da conversa
-- [x] ação de alterar status do lead
-- [x] painel de envio manual de mensagem
-- [x] indicador de status da conexão WhatsApp (com pooling)
-- [x] consumo da API com axios + interceptors (token)
-
-### Infra & DevOps
-- [x] docker-compose (perfil dev + prod separados)
-- [x] Dockerfile multi-stage para backend
-- [x] Dockerfile para admin (build → nginx static)
-- [x] config do nginx (reverse proxy + SSL + static files)
-- [x] .env.example com todas as variáveis
-- [x] scripts: setup.sh (local), deploy.sh (VPS), backup.sh (VPS)
-- [x] GitHub Actions: CI (lint + test) + CD (build + deploy VPS)
-
-### Resiliência (whatsapp-web.js)
-- [x] reconexão automática ao desconectar
-- [x] multi-session (2-3 instâncias de backup) com failover
-- [x] heartbeat via módulo health
-- [x] fila de mensagens BullMQ + Redis
-- [x] persistência de sessão em disco (LocalAuth)
-- [x] retry exponencial via BullMQ (backoff automático)
-
-### Futuro (pós-MVP)
-- [ ] migração para Meta Cloud API (trocar módulo `whatsapp`)
-- [ ] Webhooks Meta
-- [ ] CI/CD maduro com blue-green
-
----
-
-## Agentes de Desenvolvimento Propostos
-
-### 1. Agente: **Backend Core**
-- Criação do projeto NestJS, módulos, DTOs, conexão MongoDB
-- Implementação de CRUDs (leads, conversations)
-- Módulo health
-- Dockerfile multi-stage
-- Não toca no whatsapp-web.js nem no frontend
-
-### 2. Agente: **WhatsApp Engine**
-- Integração com whatsapp-web.js
-- Reconexão automática, multi-session, failover
-- Persistência de sessão (disco + MongoDB)
-- Fila de mensagens + rate limit + retry
-- Heartbeat do WhatsApp
-
-### 3. Agente: **Bot Flow**
-- Fluxos automatizados de atendimento (menus, respostas)
-- Integração com leads e conversations
-- Lógica de negócio do atendimento
-
-### 4. Agente: **Admin Dashboard**
-- React + Vite + TypeScript
-- Páginas: login, leads, conversa, envio manual
-- Consumo da API REST com axios + JWT
-- Status da conexão WhatsApp com pooling
-
-### 5. Agente: **DevOps**
-- docker-compose (dev + prod)
-- Nginx config
-- GitHub Actions workflow
-- Scripts de setup e deploy
-- Setup de VPS (UFW, Docker, certbot)
-
-### 6. Agente: **Revisor / QA**
-- Revisão de código entre agentes
-- Testes (unitários e integração)
-- Validação de consistência entre back e front
-- Linting e formatação
-- Segurança (helmet, CORS, env vars)
-
-> **Sequência sugerida:** Backend Core → WhatsApp Engine → Bot Flow → Dashboard → DevOps. O revisor atua em paralelo revisando cada entrega.
-
-> **Ordem de testes:** 1. Backend (CRUD + health) → 2. WhatsApp Engine (conexão + reconexão) → 3. Bot Flow (fluxo completo) → 4. Dashboard (integração) → 5. Teste integrado (docker-compose) → 6. Deploy VPS
+## Regra de trabalho neste repo
+- preservar comportamento
+- preferir mudanças pequenas
+- validar sempre depois das mudanças
+- tratar `context.md` como verdade canônica, a menos que o código prove o contrário
