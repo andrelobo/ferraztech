@@ -130,13 +130,13 @@ ferraztech/
 ## Diferenças importantes entre contexto antigo e código atual
 - O repo hoje **não** tem `scripts/backup.sh`.
 - O repo hoje **não** tem profile `test` funcional no `docker-compose.yml`.
-- O script `backend npm run test:e2e` existe, mas aponta para um arquivo ausente.
 - O fluxo operacional atual está mais estável e simples em `1` sessão padrão, não em `2-3` sessões por default.
 
 ## Validação esperada antes de avançar
 - backend:
   - `cd "/home/lobo/Área de trabalho/KODE/ferraztech/backend"`
   - `npm test -- --runInBand`
+  - `npm run test:e2e`
 - admin:
   - `cd "/home/lobo/Área de trabalho/KODE/ferraztech/admin"`
   - `npm test`
