@@ -1,4 +1,4 @@
-# FerrazTech
+# WATA
 
 MVP de atendimento automatizado via WhatsApp para a Ferraz Tech.
 

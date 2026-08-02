@@ -1,4 +1,4 @@
-# FERRAZTECH — Estado Atual
+# WATA — Estado Atual
 
 Atualizado em: `2026-05-28`
 
@@ -65,6 +65,14 @@ Atualizado em: `2026-05-28`
 - o modo development do compose não monta `backend/src`, então hot reload real do backend não está garantido no container
 - `scripts/backup.sh` não existe no repo, apesar de versões antigas do contexto mencionarem isso
 - os testes do admin ainda mostram warning de `act(...)` em `LeadDetailModal`, mas passam
+
+## Deploy na VPS Oracle — diagnóstico (2026-08-02)
+- **O backend WATA ainda NÃO está deployado** na VPS.
+- Último run do CI/CD (`deploy.yml`) em `2026-05-28`: testes ✅, job `deploy` ❌.
+- Causa: o script da action faz `cd /opt/ferraztech`, mas o diretório **não existe** na VPS (nunca foi clonado).
+- VPS atual (Oracle Always Free): `zera-backend-api` healthy na porta `3000` + Portainer (`9000`/`9443`). `/opt/` só contém `containerd`.
+- **Conflito de porta:** WATA usa porta `3000`, ocupada pela ZERA. Definir WATA na **`3001`** (ver mapa de portas no `context.md`).
+- Para corrigir: clonar repo em `/opt/ferraztech`, criar `.env` a partir do `.env.example` (Mongo Atlas + JWT + sessão WhatsApp), ajustar porta para `3001`, rodar `docker compose --profile production up -d --build`.
 
 ## Artefatos locais que nao devem entrar no commit
 - `backend/sessions/`

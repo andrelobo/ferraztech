@@ -1,7 +1,48 @@
-# FERRAZTECH — Contexto Canônico
+# WATA — Contexto Canônico
+
+Nome provisório do projeto: **WATA** (*WhatsApp Assistência Técnica Automatizada*). Atende o cliente comercial Ferraz Tech. Substitui o nome antigo "FerrazTech" nos docs; paths físicos (`/opt/ferraztech`, repo `ferraztech`) permanecem.
+
+## Ecossistema Muirakitan
+A WATA pertence ao ecossistema de produtos **Muirakitan**. Todos compartilham a mesma filosofia de infraestrutura e padrões. Produtos atuais:
+- **ZERA** — NestJS, Mongo Atlas, PlugNotas, JWT, Swagger; frontend na Vercel; migrando do Render para a Oracle; primeiro backend oficial na VPS (porta `3000`)
+- **HortiFácil** — novo SaaS MVP, Mongo Atlas, NestJS, frontend Vercel, backend Oracle, arquitetura desacoplada
+- **Muirakitan WhatsApp Gateway** — projeto independente, reutilizado por todos os produtos; Baileys, NestJS, Mongo Atlas, Docker, webhook engine, sessões, mensageria, arquitetura modular
+- Futuros: LicitaFácil e outros SaaS
+
+## Infraestrutura (Oracle Cloud Always Free)
+- Servidor: Oracle Cloud Always Free, hostname `lobojow`, Ubuntu Server 20.04
+- IP público: `136.248.90.172`
+- Hardware: 1 OCPU, 952 MB RAM, 2 GB swap, 45 GB SSD
+- Instalado: Docker, Docker Compose, Portainer (portas `9000`/`9443`), UFW configurado, `rpcbind` removido
+- Acesso: SSH por chave pública, sem login por senha
+
+## Filosofia da infra
+- A VPS hospeda **apenas aplicações leves**. Nunca instalar: MongoDB, PostgreSQL, Playwright, Chromium, LLMs/IA local, ou qualquer serviço pesado.
+- Banco de dados **sempre externo**: MongoDB Atlas. Nunca MongoDB local.
+- Frontend **sempre na Vercel** (React/Vite, Next.js quando necessário). Nunca hospedar frontend na Oracle.
+- Backend **sempre NestJS**, Node 20+, Docker. Cada backend com: Dockerfile, docker-compose.yml, `.env.example`, healthcheck, logs e Swagger.
+- Reverse proxy futuro: **Caddy (preferencial) ou Nginx**. Nunca expor aplicações diretamente em produção.
+- Padrões: TypeScript, ESLint, Prettier, Docker, Docker Compose, variáveis via `.env`, nunca credenciais hardcoded, dependências mínimas, baixo consumo de memória.
+
+## Organização da VPS
+Cada projeto em `/opt/<projeto>` com Compose, Dockerfile, volumes e rede Docker próprios:
+- `/opt/zera-api`
+- `/opt/hortifacil-api`
+- `/opt/muirakitan-wsp-gateway`
+- `/opt/ferraztech` (a criar — ainda não existe)
+
+Mapa de portas padrão por projeto (evitar colisão; reverse proxy assumirá roteamento por domínio):
+- `3000` → ZERA
+- `3001` → WATA (proposta)
+- `3002+` → próximos projetos
+
+## Deploy
+- Hoje: manual (`git pull` + `docker compose up -d --build`); na VPS cada projeto é clonado em `/opt/<projeto>`.
+- Objetivo futuro: GitHub → GitHub Actions → SSH → Oracle VPS → Docker Compose → deploy automático.
+- A action atual `deploy.yml` assume `/opt/ferraztech` existente e roda `--profile production`.
 
 ## O que é
-MVP de atendimento automatizado via WhatsApp para a FERRAZTECH.
+MVP de atendimento automatizado via WhatsApp para a Ferraz Tech.
 
 Objetivo atual:
 - validar um fluxo funcional de atendimento para desbloqueio de iPhone

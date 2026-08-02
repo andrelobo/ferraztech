@@ -1,4 +1,4 @@
-# Workflow — FerrazTech
+# Workflow — WATA
 
 ## Regras de desenvolvimento
 - **1 coisa de cada vez** — um arquivo por commit
