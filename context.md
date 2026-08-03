@@ -2,6 +2,26 @@
 
 Nome provisório do projeto: **WATA** (*WhatsApp Assistência Técnica Automatizada*). Atende o cliente comercial Ferraz Tech. Substitui o nome antigo "FerrazTech" nos docs; paths físicos (`/opt/ferraztech`, repo `ferraztech`) permanecem.
 
+## Próximos passos (quando voltarmos)
+**Deploy integrado já está validado ponta a ponta na VPS.** O que falta é apenas o que depende do operador:
+
+1. **Escanear o QR** da sessão `atendimento-principal` para abrir a conexão WhatsApp:
+   - QR em `http://136.248.90.172:3001/api/whatsapp/qr` (PNG) ou `GET /api/whatsapp/qr` (via painel admin).
+   - Fluxo: WhatsApp → Aparelhos conectados → Vincular → apontar a câmera para o QR.
+   - Após scan, conferir `GET /api/whatsapp/status` → state deve ir de `qr` para `open`.
+2. **Testar envio real**: pelo admin, mandar uma mensagem manual para um número de teste e validar `message.upsert` → lead/conversa → resposta do bot.
+3. **Observar os logs**: `docker logs -f ferraztech-backend` deve mostrar `POST /api/webhooks/gateway` (eventos do gateway) e o fluxo `message.upsert → handleIncomingMessage`.
+
+Credenciais/segredos da integração (API key do tenant, webhook secret, senhas) estão **somente no `.env` da VPS** — nunca commitá-los.
+
+Se a sessão aparecer como `close`/`disconnected` ao voltar (morte da conexão Baileys sem número linkado), **recriar** a sessão:
+```
+curl -X POST -H "Authorization: Bearer <GATEWAY_API_KEY>" -H "content-type: application/json" \
+  -d '{"name":"atendimento-principal"}' \
+  http://localhost:3002/api/tenants/<GATEWAY_TENANT_ID>/sessions
+```
+(um novo evento `qr.updated` será entregue ao WATA automaticamente).
+
 ## Ecossistema Muirakitan
 A WATA pertence ao ecossistema de produtos **Muirakitan**. Todos compartilham a mesma filosofia de infraestrutura e padrões. Produtos atuais:
 - **ZERA** — NestJS, Mongo Atlas, PlugNotas, JWT, Swagger; frontend na Vercel; migrando do Render para a Oracle; primeiro backend oficial na VPS (porta `3000`)
@@ -29,26 +49,33 @@ Cada projeto em `/opt/<projeto>` com Compose, Dockerfile, volumes e rede Docker 
 - `/opt/zera-api`
 - `/opt/hortifacil-api`
 - `/opt/muirakitan-wsp-gateway`
-- `/opt/ferraztech` (a criar — ainda não existe)
+- `/opt/ferraztech` (deployado; repo público → VPS faz `git pull`; gateway é privado → sync por tar/scp)
 
 Mapa de portas padrão por projeto (evitar colisão; reverse proxy assumirá roteamento por domínio):
 - `3000` → ZERA
-- `3001` → WATA (proposta)
+- `3001` → WATA (em produção)
 - `3002` → Muirakitan WhatsApp Gateway (já em produção)
 - `3003+` → próximos projetos
 
 ## Deploy
 - Hoje: manual (`git pull` + `docker compose up -d --build`); na VPS cada projeto é clonado em `/opt/<projeto>`.
+- WATA (repo `ferraztech`): **público** → VPS faz `git pull` normal.
+- Gateway (repo `muirakitan-wsp-gateway`): **privado** → sincronizar por `tar` + `scp` + extrair em `/opt/muirakitan-wsp-gateway` + `docker compose up -d --build`.
+- **`BUILD_TARGET=production` é obrigatório** no WATA (sem isso o container reinicia em loop, sem CMD).
 - Objetivo futuro: GitHub → GitHub Actions → SSH → Oracle VPS → Docker Compose → deploy automático.
 - A action atual `deploy.yml` assume `/opt/ferraztech` existente e roda `--profile production`.
 
-## Estado do gateway (2026-08-02)
+## Estado do gateway (2026-08-03)
 - **Muirakitan WhatsApp Gateway** construído e deployado na VPS na porta **`3002`** (app interno `3000`, host via `GATEWAY_PORT`).
-- Repo privado: `github.com/andrelobo/muirakitan-wsp-gateway` (MVP commitado: `ae6ffc9` + fix `881d3d5`).
+- Repo privado: `github.com/andrelobo/muirakitan-wsp-gateway` (MVP commitado; último fix de integração `a561efe`).
 - Local do VPS: `/opt/muirakitan-wsp-gateway` (compose + redis + gateway). Docker Compose v2 instalado na VPS (faltava o plugin).
 - Banco: Mongo Atlas, database **`ferraztech`** (URI no `.env` do VPS, nunca commitada).
-- Endpoints validados: `GET /api/health` ✅, `POST /api/tenants` ✅ (persistiu no Atlas), `401` sem API key ✅, Swagger `:3002/docs` ✅.
-- Tenant `wata` já criado no gateway (API key retornada 1x — guardada pelo operador).
+- Endpoints validados: `GET /api/health` ✅, `POST /api/tenants` ✅, `401` sem API key ✅, Swagger `:3002/docs` ✅.
+- Tenant `wata` no gateway: `webhookUrl=http://ferraztech-backend:3000/api/webhooks/gateway` + `webhookSecret` (HMAC) — **o gateway entrega eventos lendo `tenant.webhookUrl`** (fila BullMQ `webhook`, redis próprio `muirakitan-gw-redis`).
+- **Integração WATA × gateway validada (2026-08-03):** comunicação entre containers por **nome de container** na rede docker compartilhada `muirakitan-wsp-gateway_default` (IPs de bridge `172.x` falham com EHOSTUNREACH). `GATEWAY_BASE_URL=http://muirakitan-wsp-gateway:3000/api`. Evento `qr.updated` → fila → `tenant.webhookUrl` → `POST /api/webhooks/gateway` assinado → WATA responde `201 received:true`.
+- Fix de integração no gateway: `IsWebhookUrl` (validator custom) aceita **hostnames de container docker** (`@IsUrl` rejeita hostname sem ponto). Commit `a561efe`.
+- Fix operacional: índice único órfão `sessionId_1` dropado da collection `sessions` (causava `E11000` ao criar sessão).
+- Sessão ativa: `atendimento-principal` (`state: qr`), QR pendente de escaneamento.
 - **Migração WATA concluída no código (2026-08-02):** o backend WATA agora consome o gateway — envio via `POST /sessions/:id/send` e recepção via webhook `POST /api/webhooks/gateway` (assinado HMAC-SHA256). A camada local `whatsapp-web.js` (Chromium) foi removida do backend e do `package.json`. Ver `.env.example` (chaves `GATEWAY_*`) e módulo `whatsapp`.
 
 
@@ -85,7 +112,7 @@ Evolução planejada:
 - Em desenvolvimento local, o caminho mais confiável hoje é:
   - backend por `npm run start` ou `npm run start:dev`
   - admin por `npm run dev`
-- O `docker-compose.yml` existe e sobe `redis`, `backend`, `admin` e `nginx`, mas o modo development atual não entrega hot reload real do backend porque não monta `src` no container.
+- O `docker-compose.yml` sobe `backend`, `admin` e `nginx` (sem redis — o WATA não usa mais fila). O backend é anexado à rede docker do gateway (`muirakitan-wsp-gateway_default`) para comunicação por nome de container. O modo development atual não entrega hot reload real do backend porque não monta `src` no container.
 
 ## Backend — módulos reais
 - `auth` — login JWT, guard e strategy
