@@ -1,96 +1,95 @@
-import { BadRequestException, Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { InjectQueue } from '@nestjs/bullmq'
-import { Queue } from 'bullmq'
-import { WhatsAppSession } from './whatsapp.session'
+import { GatewayClientService, GatewayQrResult } from './gateway-client.service'
 import { BotService } from '../bot/bot.service'
 import { ConversationsService } from '../conversations/conversations.service'
 import { LeadsService } from '../leads/leads.service'
 
+export interface SessionStatus {
+  id: string
+  connected: boolean
+  qrCode: string | null
+  retryCount: number
+  startTime: number
+}
+
 @Injectable()
-export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
+export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name)
-  private sessions: WhatsAppSession[] = []
-  private startTime = Date.now()
+  private readonly startTime = Date.now()
 
   constructor(
-    private configService: ConfigService,
-    @InjectQueue('whatsapp') private whatsappQueue: Queue,
-    private botService: BotService,
-    private conversationsService: ConversationsService,
-    private leadsService: LeadsService,
+    private readonly configService: ConfigService,
+    private readonly gatewayClient: GatewayClientService,
+    private readonly botService: BotService,
+    private readonly conversationsService: ConversationsService,
+    private readonly leadsService: LeadsService,
   ) {}
 
-  async onModuleInit() {
-    const count = this.configService.get('WHATSAPP_SESSION_COUNT', 1)
-    this.logger.log(`🚀 Inicializando motor do WhatsApp com ${count} sessão(ões)`)
-
-    for (let i = 1; i <= count; i++) {
-      const session = new WhatsAppSession(
-        `session-${i}`,
-        this.configService,
-        (from, body) => this.handleIncomingMessage(from, body).catch((err) =>
-          this.logger.error(`Error handling message from ${from}`, err),
-        ),
+  getSessionId(): string {
+    const sessionId = this.configService.get<string>('GATEWAY_SESSION_ID', '')
+    if (!sessionId) {
+      throw new ServiceUnavailableException(
+        'GATEWAY_SESSION_ID não configurado no backend WATA',
       )
-      this.sessions.push(session)
-      this.logger.log(`🧩 Subindo ${session.id}`)
-      await session.start()
     }
+    return sessionId
   }
 
-  async onModuleDestroy() {
-    this.logger.log('🛑 Encerrando sessões do WhatsApp...')
-    await Promise.all(this.sessions.map((s) => s.stop()))
-    this.sessions = []
+  private getTenantId(): string {
+    const tenantId = this.configService.get<string>('GATEWAY_TENANT_ID', '')
+    if (!tenantId) {
+      throw new ServiceUnavailableException(
+        'GATEWAY_TENANT_ID não configurado no backend WATA',
+      )
+    }
+    return tenantId
   }
 
-  getStatus() {
-    const states = this.sessions.map((s) => s.state)
-    const activeSession = states.find((s) => s.connected)?.id || null
+  async getStatus() {
+    const gatewaySessions = await this.gatewayClient.listTenantSessions(
+      this.getTenantId(),
+    )
+
+    const sessions: SessionStatus[] = gatewaySessions.map((session) => ({
+      id: String(session._id),
+      connected: session.state === 'open',
+      qrCode: session.qr ?? null,
+      retryCount: 0,
+      startTime: 0,
+    }))
+
+    const activeSession = sessions.find((session) => session.connected)?.id ?? null
+
     return {
-      sessions: states,
+      sessions,
       activeSession,
       uptime: Math.floor((Date.now() - this.startTime) / 1000),
     }
   }
 
+  async getQr(sessionId?: string): Promise<GatewayQrResult> {
+    return this.gatewayClient.getQr(sessionId ?? this.getSessionId())
+  }
+
   async sendMessage(to: string, message: string) {
-    const connectedSessions = this.sessions.filter((session) => session.state.connected)
-    let lastError: unknown = null
-
-    for (const session of connectedSessions) {
-      try {
-        await session.sendMessage(to, message)
-        this.logger.log(`📤 Mensagem enviada para ${to} via ${session.id}`)
-        return { sent: true, to, message, sessionId: session.id }
-      } catch (err) {
-        lastError = err
-        this.logger.warn(
-          `⚠️ [${session.id}] Falha ao enviar mensagem para ${to}: ${err instanceof Error ? err.message : err}`,
-        )
-      }
+    try {
+      await this.gatewayClient.sendText(this.getSessionId(), to, message)
+      this.logger.log(`📤 Mensagem enfileirada para ${to}`)
+      return { sent: true, to, message, sessionId: this.getSessionId() }
+    } catch (err) {
+      throw this.mapSendFailure(to, err)
     }
-
-    if (connectedSessions.length === 0) {
-      this.logger.warn(`📬 Nenhuma sessão conectada. Mensagem para ${to} foi para a fila`)
-      await this.whatsappQueue.add('send', { to, message })
-      return { queued: true, to, message }
-    }
-
-    throw this.mapSendFailure(to, lastError)
   }
 
   private mapSendFailure(to: string, error: unknown) {
-    if (error instanceof Error) {
-      if (
-        error.message.includes('WhatsApp number not found') ||
-        error.message.includes('No LID for user')
-      ) {
-        return new BadRequestException(
-          `Nao foi possivel localizar o numero ${to} no WhatsApp para envio.`,
-        )
-      }
+    if (error instanceof Error && error.message.includes('Gateway não configurado')) {
+      return new ServiceUnavailableException(error.message)
     }
 
     return new BadRequestException(
@@ -98,7 +97,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     )
   }
 
-  private async handleIncomingMessage(from: string, body: string) {
+  async handleIncomingMessage(from: string, body: string) {
     this.logger.log(`📨 Mensagem recebida de ${from}: len=${body.length}`)
     let conversation = await this.conversationsService.findByPhone(from)
     const isNewContact = !conversation
