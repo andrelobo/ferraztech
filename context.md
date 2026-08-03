@@ -34,12 +34,23 @@ Cada projeto em `/opt/<projeto>` com Compose, Dockerfile, volumes e rede Docker 
 Mapa de portas padrão por projeto (evitar colisão; reverse proxy assumirá roteamento por domínio):
 - `3000` → ZERA
 - `3001` → WATA (proposta)
-- `3002+` → próximos projetos
+- `3002` → Muirakitan WhatsApp Gateway (já em produção)
+- `3003+` → próximos projetos
 
 ## Deploy
 - Hoje: manual (`git pull` + `docker compose up -d --build`); na VPS cada projeto é clonado em `/opt/<projeto>`.
 - Objetivo futuro: GitHub → GitHub Actions → SSH → Oracle VPS → Docker Compose → deploy automático.
 - A action atual `deploy.yml` assume `/opt/ferraztech` existente e roda `--profile production`.
+
+## Estado do gateway (2026-08-02)
+- **Muirakitan WhatsApp Gateway** construído e deployado na VPS na porta **`3002`** (app interno `3000`, host via `GATEWAY_PORT`).
+- Repo privado: `github.com/andrelobo/muirakitan-wsp-gateway` (MVP commitado: `ae6ffc9` + fix `881d3d5`).
+- Local do VPS: `/opt/muirakitan-wsp-gateway` (compose + redis + gateway). Docker Compose v2 instalado na VPS (faltava o plugin).
+- Banco: Mongo Atlas, database **`ferraztech`** (URI no `.env` do VPS, nunca commitada).
+- Endpoints validados: `GET /api/health` ✅, `POST /api/tenants` ✅ (persistiu no Atlas), `401` sem API key ✅, Swagger `:3002/docs` ✅.
+- Tenant `wata` já criado no gateway (API key retornada 1x — guardada pelo operador).
+- **Migração WATA concluída no código (2026-08-02):** o backend WATA agora consome o gateway — envio via `POST /sessions/:id/send` e recepção via webhook `POST /api/webhooks/gateway` (assinado HMAC-SHA256). A camada local `whatsapp-web.js` (Chromium) foi removida do backend e do `package.json`. Ver `.env.example` (chaves `GATEWAY_*`) e módulo `whatsapp`.
+
 
 ## O que é
 MVP de atendimento automatizado via WhatsApp para a Ferraz Tech.
@@ -53,7 +64,7 @@ Escala inicial esperada:
 - aproximadamente `50` atendimentos por dia
 
 Evolução planejada:
-- manter o MVP em `whatsapp-web.js`
+- manter o MVP consumindo o **Muirakitan WhatsApp Gateway** (Baileys, sem Chromium)
 - migrar no futuro para `Meta Cloud API`
 
 ## Stack real do projeto
@@ -61,8 +72,8 @@ Evolução planejada:
 |---|---|
 | Backend | NestJS + TypeScript |
 | Banco | MongoDB Atlas |
-| WhatsApp | whatsapp-web.js |
-| Fila | BullMQ + Redis |
+| WhatsApp | Muirakitan WhatsApp Gateway (Baileys) via REST + webhook |
+| Fila | gateway (BullMQ + Redis fica no gateway) |
 | Frontend | React + Vite + TypeScript |
 | Proxy local do front | Vite proxy para `/api` |
 | Proxy de produção | Nginx |
@@ -79,7 +90,7 @@ Evolução planejada:
 ## Backend — módulos reais
 - `auth` — login JWT, guard e strategy
 - `seed` — cria admin inicial se não existir
-- `whatsapp` — sessão do WhatsApp, QR, envio, fila, reconexão
+- `whatsapp` — cliente do gateway (envio REST), webhook de eventos e fluxo de mensagens
 - `bot` — fluxo automatizado de atendimento
 - `leads` — CRUD e status de leads
 - `conversations` — histórico de mensagens por telefone
@@ -113,12 +124,14 @@ Observação importante:
 - hoje o bot considera IMEI válido como qualquer sequência com `15` dígitos
 
 ## WhatsApp — estado de projeto
-- padrão atual: `WHATSAPP_SESSION_COUNT=1`
-- QR code é servido pelo backend em `GET /api/whatsapp/qr`
-- status da sessão é servido em `GET /api/whatsapp/status`
-- envio manual usa `POST /api/whatsapp/send-message`
-- a captura de inbound já contempla remetentes `@lid`, `@c.us` e `@s.whatsapp.net`
-- grupos e `status@broadcast` são ignorados
+- transporte: **Muirakitan WhatsApp Gateway** — sessões, QR e envio ficam no gateway (porta `3002` na VPS)
+- env vars: `GATEWAY_BASE_URL`, `GATEWAY_API_KEY`, `GATEWAY_TENANT_ID`, `GATEWAY_SESSION_ID`, `GATEWAY_WEBHOOK_SECRET`
+- webhook WATA: `POST /api/webhooks/gateway` (publico, validado por HMAC-SHA256 via header `x-muirakitan-signature`; `@SkipThrottle`)
+- QR code é servido pelo backend em `GET /api/whatsapp/qr` (proxy do gateway `GET /sessions/:id/qr`)
+- status da sessão é servido em `GET /api/whatsapp/status` (proxy do gateway `GET /tenants/:id/sessions`)
+- envio manual usa `POST /api/whatsapp/send-message` (proxy do gateway `POST /sessions/:id/send`)
+- `message.upsert` chega via webhook → `handleIncomingMessage` (mesmo fluxo de lead/conversa/bot de antes)
+- grupos e `status@broadcast` são ignorados (normalização de JID no webhook controller)
 - há logs em emoji no terminal do Nest para request, sessão e fluxo de mensagem
 
 ## Endpoints principais
