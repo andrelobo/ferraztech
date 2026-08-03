@@ -7,7 +7,6 @@ import { WhatsAppService } from './whatsapp.service'
 
 describe('WhatsAppWebhookController', () => {
   let controller: WhatsAppWebhookController
-  let whatsappService: WhatsAppService
 
   const mockWhatsAppService = {
     handleIncomingMessage: jest.fn().mockResolvedValue(undefined),
@@ -32,7 +31,6 @@ describe('WhatsAppWebhookController', () => {
     }).compile()
 
     controller = module.get<WhatsAppWebhookController>(WhatsAppWebhookController)
-    whatsappService = module.get<WhatsAppService>(WhatsAppService)
   })
 
   const sign = (rawBody: Buffer) =>

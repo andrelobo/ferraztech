@@ -62,7 +62,7 @@ export class BotService {
     return this.buildImeiRequestReply()
   }
 
-  private async handleNewContact(msg: IncomingMessage): Promise<BotReply> {
+  private async handleNewContact(_msg: IncomingMessage): Promise<BotReply> {
     return {
       reply:
         `Olá! Seja bem-vindo à *Ferraz Tech*.\n\n` +

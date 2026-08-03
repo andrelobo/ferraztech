@@ -16,7 +16,6 @@ jest.mock('qrcode', () => ({
 describe('WhatsAppModule', () => {
   let service: WhatsAppService
   let controller: WhatsAppController
-  let botService: BotService
 
   const mockGatewayClient = {
     sendText: jest.fn(),
@@ -69,7 +68,6 @@ describe('WhatsAppModule', () => {
 
     service = module.get<WhatsAppService>(WhatsAppService)
     controller = module.get<WhatsAppController>(WhatsAppController)
-    botService = module.get<BotService>(BotService)
   })
 
   describe('WhatsAppService', () => {

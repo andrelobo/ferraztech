@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getModelToken } from '@nestjs/mongoose'
-import { Model } from 'mongoose'
 import { LeadsService } from './leads.service'
 import { LeadsController } from './leads.controller'
 import { Lead } from './schemas/lead.schema'
