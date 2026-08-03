@@ -26,17 +26,14 @@ export class WhatsAppController {
   ) {}
 
   @Get('qr')
-  async getQR(@Query('session') sessionId: string, @Res() res: Response) {
-    this.logger.log(`📲 QR solicitado para session=${sessionId || 'auto'}`)
-    const status = this.whatsappService.getStatus()
-    const session = (sessionId
-      ? status.sessions.find((s) => s.id === sessionId)
-      : null) || status.sessions.find((s) => s.qrCode) || status.sessions[0]
-    if (!session || !session.qrCode) {
+  async getQR(@Query('session') sessionId: string | undefined, @Res() res: Response) {
+    this.logger.log(`📲 QR solicitado para session=${sessionId || 'configurada'}`)
+    const qr = await this.whatsappService.getQr(sessionId)
+    if (!qr.qr) {
       throw new NotFoundException('QR code not available')
     }
     try {
-      const png = await QRCode.toBuffer(session.qrCode, { width: 400, margin: 2 })
+      const png = await QRCode.toBuffer(qr.qr, { width: 400, margin: 2 })
       res.setHeader('Content-Type', 'image/png')
       res.send(png)
     } catch (err) {
