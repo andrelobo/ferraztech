@@ -10,6 +10,9 @@ services:
       - "${WATA_HTTP_PORT:-3001}:3000"
     volumes:
       - ./data/whatsapp-sessions:/app/sessions
+    networks:
+      - default
+      - gateway
     profiles:
       - production
       - development
@@ -38,3 +41,8 @@ services:
       - backend
     profiles:
       - production
+
+networks:
+  gateway:
+    name: muirakitan-wsp-gateway_default
+    external: true
