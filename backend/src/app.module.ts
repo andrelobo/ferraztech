@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { MongooseModule } from '@nestjs/mongoose'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
-import { BullModule } from '@nestjs/bullmq'
 import { APP_GUARD } from '@nestjs/core'
 import { APP_INTERCEPTOR } from '@nestjs/core'
 import { HealthModule } from './modules/health/health.module'
@@ -33,16 +32,6 @@ import { RequestLoggingInterceptor } from './common/interceptors/request-logging
         limit: 60,
       },
     ]),
-    BullModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        connection: {
-          host: config.get('REDIS_HOST', 'localhost'),
-          port: config.get('REDIS_PORT', 6379),
-        },
-      }),
-    }),
     HealthModule,
     LeadsModule,
     ConversationsModule,
